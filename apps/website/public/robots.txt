@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://file-brain.com/sitemap.xml

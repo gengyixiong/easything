@@ -1,54 +1,6 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Hidden files except some
-.*
-!.gitignore
-!.gitattributes
-!.kilocode/
-!.env.example
-!.github/
-
-# Python
+.venv/
 __pycache__/
 *.py[cod]
-*$py.class
-.venv/
-.pytest_cache/
-.mypy_cache/
-.tox/
-.env
-
-# Next.js
-.next/
-out/
-
-# Database files
-*.db
-*.db-shm
-*.db-wal
-
-# Typesense data
-typesense-data/
+build/
+dist/
+*.log

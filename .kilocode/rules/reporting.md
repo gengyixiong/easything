@@ -1,1 +1,0 @@
-- Do not write `.md` files for reporting unless explicitly asked to.
