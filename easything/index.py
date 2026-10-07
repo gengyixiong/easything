@@ -91,8 +91,8 @@ class Index:
         self.manifest.commit()
 
     def index_file(self, path):
+        source = Path(path).resolve()
         path = canonical(path)
-        source = Path(path)
         stat = source.stat()
         old = self.manifest.execute("SELECT size,mtime,hash FROM files WHERE path=?", (path,)).fetchone()
         if old and old[:2] == (stat.st_size, stat.st_mtime_ns):

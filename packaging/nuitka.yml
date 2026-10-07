@@ -1,0 +1,14 @@
+- module-name: 'litert_lm'
+  dlls:
+    - from_filenames:
+        prefixes:
+          - 'litert-lm'
+          - 'dxcompiler'
+          - 'dxil'
+      when: 'win32'
+- module-name: 'pymupdf'
+  dlls:
+    - from_filenames:
+        prefixes:
+          - 'mupdfcpp64'
+      when: 'win32'
