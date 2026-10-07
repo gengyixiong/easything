@@ -61,13 +61,23 @@ def read_units(path, cache):
     elif suffix == ".pptx":
         presentation = Presentation(path)
         app = deck = None
+        owns_app = False
+        old_security = None
         import pythoncom
         import win32com.client
 
         pythoncom.CoInitialize()
         try:
             try:
-                app = win32com.client.DispatchEx("PowerPoint.Application")
+                try:
+                    app = win32com.client.GetActiveObject("PowerPoint.Application")
+                except pythoncom.com_error:
+                    app = win32com.client.DispatchEx("PowerPoint.Application")
+                    owns_app = True
+                if any(Path(app.Presentations(i).FullName).resolve() == path.resolve()
+                       for i in range(1, app.Presentations.Count + 1)):
+                    raise ValueError("This presentation is already open in PowerPoint; using text-only indexing.")
+                old_security = app.AutomationSecurity
                 app.AutomationSecurity = 3
                 deck = app.Presentations.Open(str(path.resolve()), ReadOnly=True, WithWindow=False)
             except Exception:
@@ -95,7 +105,10 @@ def read_units(path, cache):
                     logging.exception("Could not close read-only PowerPoint presentation")
             if app is not None:
                 try:
-                    app.Quit()
+                    if old_security is not None:
+                        app.AutomationSecurity = old_security
+                    if owns_app and app.Presentations.Count == 0:
+                        app.Quit()
                 except Exception:
                     logging.exception("Could not close EasyThing PowerPoint instance")
             pythoncom.CoUninitialize()

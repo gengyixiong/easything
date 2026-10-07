@@ -77,28 +77,36 @@ class Index:
         self.manifest = sqlite3.connect(directory / "files.sqlite3")
         self.manifest.execute("CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, size INTEGER, mtime INTEGER, hash TEXT)")
         self.manifest.commit()
-        self.fts_ready = False
+        self.fts_ready = any("search_text" in info.columns for info in self.table.list_indices())
 
     def close(self):
         self.manifest.close()
 
-    def paths(self):
-        return [row[0] for row in self.manifest.execute("SELECT path FROM files")]
+    def signatures(self):
+        return {row[0]: row[1:] for row in self.manifest.execute("SELECT path,size,mtime FROM files")}
 
     def remove(self, path):
-        self.table.delete(f"path = {sql_string(path)}")
-        self.manifest.execute("DELETE FROM files WHERE path = ?", (path,))
+        self.remove_many([path])
+
+    def remove_many(self, paths):
+        if not paths:
+            return
+        self.table.delete("path IN (" + ",".join(sql_string(path) for path in paths) + ")")
+        self.manifest.executemany("DELETE FROM files WHERE path = ?", [(path,) for path in paths])
         self.manifest.commit()
 
-    def index_file(self, path):
+    def index_file(self, path, force=False):
         source = Path(path).resolve()
         path = canonical(path)
         stat = source.stat()
         old = self.manifest.execute("SELECT size,mtime,hash FROM files WHERE path=?", (path,)).fetchone()
-        if old and old[:2] == (stat.st_size, stat.st_mtime_ns):
+        same_stat = old and old[:2] == (stat.st_size, stat.st_mtime_ns)
+        if same_stat and not force:
             return "unchanged"
         with source.open("rb") as stream:
             file_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+        if same_stat and file_hash == old[2]:
+            return "unchanged"
         previous = {row["content_hash"]: row["vector"] for row in
                     self.table.search().where(f"path = {sql_string(path)}").limit(None).to_list()}
         rows = []
@@ -131,7 +139,7 @@ class Index:
         self.manifest.execute("INSERT OR REPLACE INTO files VALUES (?,?,?,?)",
                               (path, stat.st_size, stat.st_mtime_ns, file_hash))
         self.manifest.commit()
-        return "PPTX text indexed; slide visuals unavailable (PowerPoint required)." if text_only else "indexed"
+        return "PPTX text indexed; PowerPoint slide rendering unavailable or presentation already open." if text_only else "indexed"
 
     def search(self, text, folders, kind="All"):
         if not text.strip() or not self.table.count_rows():

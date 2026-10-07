@@ -14,7 +14,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
 OutputBaseFilename=EasyThing-Setup
-Compression=lzma2
+Compression=lzma2/fast
 SolidCompression=yes
 LicenseFile=..\LICENSE
 WizardStyle=modern
@@ -25,7 +25,7 @@ RestartApplications=no
 AppMutex=Local\EasyThingDesktop
 
 [Files]
-Source: "..\build\launch.dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\build\frozen\EasyThing\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\EasyThing"; Filename: "{app}\EasyThing.exe"
@@ -66,11 +66,9 @@ begin
   DeleteIndex := HasParameter('/DELETEINDEX');
   DeleteSettings := HasParameter('/DELETESETTINGS');
   if UninstallSilent then begin Result := True; Exit; end;
-  Form := CreateCustomForm();
+  Form := CreateCustomForm(ScaleX(480), ScaleY(260), False, False);
   try
     Form.Caption := 'Uninstall EasyThing';
-    Form.ClientWidth := ScaleX(480);
-    Form.ClientHeight := ScaleY(260);
     LabelText := TNewStaticText.Create(Form);
     LabelText.Parent := Form;
     LabelText.SetBounds(ScaleX(20), ScaleY(16), ScaleX(440), ScaleY(48));

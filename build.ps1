@@ -7,17 +7,10 @@ if (-not (Test-Path -LiteralPath $python)) {
 }
 & $python -m pip install -r requirements-build.txt
 if ($LASTEXITCODE) { throw 'Dependency installation failed' }
-& $python -m nuitka --mode=standalone --msvc=latest --enable-plugin=pyside6 `
-    --include-qt-plugins=sensible --include-package=easything `
-    --include-package=win32com.client --include-module=pythoncom --include-module=pywintypes `
-    --include-package-data=pptx `
-    --user-package-configuration-file=packaging/nuitka.yml `
-    --nofollow-import-to=pytest,IPython,matplotlib,pandas,scipy,torch,tensorflow,numba `
-    --windows-console-mode=disable --output-filename=EasyThing.exe `
-    --output-dir=build --assume-yes-for-downloads --jobs=8 launch.py
-if ($LASTEXITCODE) { throw 'Nuitka build failed' }
+& $python -m PyInstaller --noconfirm --distpath build/frozen --workpath build/pyinstaller packaging/EasyThing.spec
+if ($LASTEXITCODE) { throw 'Executable packaging failed' }
 # Collect dependency notices alongside the replaceable shared libraries.
-& $python packaging/licenses.py build/launch.dist
+& $python packaging/licenses.py build/frozen/EasyThing
 if ($LASTEXITCODE) { throw 'License collection failed' }
 $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
 if (-not (Test-Path -LiteralPath $iscc)) { throw 'Install Inno Setup 6 to build EasyThing-Setup.exe' }

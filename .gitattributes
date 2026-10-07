@@ -1,5 +1,4 @@
-# Mark PrimeReact themes as vendored to exclude from language stats
-apps/file-brain/frontend/public/themes/** linguist-vendored
-
-# Mark local lib as vendored
-apps/file-brain/file_brain/lib/** linguist-vendored
+* text=auto
+*.py text eol=lf
+*.ps1 text eol=crlf
+*.iss text eol=crlf

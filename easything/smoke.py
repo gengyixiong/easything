@@ -26,6 +26,13 @@ class CountedEmbedder(Embedder):
         return super().encode(*args, **kwargs)
 
 
+class UnavailableGPU(Embedder):
+    def _load(self, gpu):
+        if gpu:
+            raise RuntimeError("GPU unavailable (smoke check)")
+        return super()._load(False)
+
+
 def wait_for(app, predicate, timeout=40):
     until = time.monotonic() + timeout
     while time.monotonic() < until:
@@ -46,6 +53,10 @@ def run():
         for name in ("models", "index", "cache", "settings", "logs"):
             (root / name).mkdir(parents=True)
         os.link(real_root / "models" / MODEL_FILE, root / "models" / MODEL_FILE)
+        fallback = UnavailableGPU(root)
+        assert len(fallback.encode("IFC certification", query=True)) == 768
+        assert fallback.backend == "CPU"
+        fallback.close()
         selected, outside = base / "selected's_%", base / "outside"
         selected.mkdir()
         outside.mkdir()
@@ -126,11 +137,15 @@ def run():
         print("Restart persistence, page hash reuse and source integrity OK", flush=True)
         worker = Worker(root, {"folders": folders}, cpu_only=True)
         issues = []
+        reconciled = []
+        worker.progress.connect(lambda done, total, name: reconciled.append((done, total)))
         worker.issue.connect(issues.append)
         worker.start()
         fresh = selected / "fresh.md"
         try:
             time.sleep(1)
+            wait_for(app, lambda: bool(reconciled))
+            assert reconciled[0] == (0, 0), "Restart must not queue unchanged files"
             fresh.write_text("Fresh local search document", encoding="utf-8")
             def count_path(path):
                 import lancedb

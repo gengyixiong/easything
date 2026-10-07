@@ -44,7 +44,7 @@ class Worker(QThread):
     def __init__(self, root, settings, cpu_only=False):
         super().__init__()
         self.root = Path(root)
-        self.folders = settings.get("folders", [])
+        self.folders = [dict(folder) for folder in settings.get("folders", [])]
         self.cpu_only = cpu_only
         self.commands = queue.Queue()
         self.pending = {}
@@ -79,16 +79,25 @@ class Worker(QThread):
     def reconcile(self):
         if self.index is None:
             return
-        for path in self.index.paths():
-            if not in_scope(path, self.folders, enabled_only=False):
-                self.index.remove(path)
-            elif in_scope(path, self.folders) and not Path(path).exists():
-                self.index.remove(path)
+        signatures = self.index.signatures()
+        removed = [path for path in signatures if not in_scope(path, self.folders, enabled_only=False)
+                   or (in_scope(path, self.folders) and not Path(path).exists())]
+        self.index.remove_many(removed)
         # Disabled folders keep their index but are never scanned or searched.
         for path in selected_files(self.folders):
-            self.pending[path] = (0, 0)
+            try:
+                stat = Path(path).stat()
+                if signatures.get(path) != (stat.st_size, stat.st_mtime_ns):
+                    self.pending.setdefault(path, (0, 0, False))
+            except OSError:
+                logging.exception("Could not inspect file: %s", path)
+                self.issue.emit(f"Could not read {Path(path).name}; other files will continue.")
         self.done, self.total = 0, len(self.pending)
         self.progress.emit(self.done, self.total, "")
+        self.status.emit("Ready" if not self.pending else (
+            "Indexing changed files" if (self.root / "models" / MODEL_FILE).is_file()
+            else "Download EmbeddingGemma 2 to start indexing"
+        ))
 
     def run(self):
         self.embedder = Embedder(self.root, cpu_only=self.cpu_only)
@@ -122,7 +131,7 @@ class Worker(QThread):
                     elif command == "event":
                         path = canonical(value)
                         if Path(path).suffix.lower() in SUPPORTED and in_scope(path, self.folders):
-                            self.pending[path] = (time.monotonic() + 1, 0)
+                            self.pending[path] = (time.monotonic() + 1, 0, True)
                             self.total = self.done + len(self.pending)
                     elif command == "download":
                         self.status.emit("Downloading EmbeddingGemma 2…")
@@ -168,16 +177,16 @@ class Worker(QThread):
                         continue
                     if not (self.root / "models" / MODEL_FILE).is_file():
                         continue
-                    path = next((p for p, (when, _) in self.pending.items() if when <= time.monotonic()), None)
+                    path = next((p for p, (when, _, _) in self.pending.items() if when <= time.monotonic()), None)
                     if path is None:
                         continue
-                    _, attempts = self.pending.pop(path)
+                    _, attempts, force = self.pending.pop(path)
                     if not in_scope(path, self.folders):
                         continue
                     self.progress.emit(self.done, self.total, Path(path).name)
                     try:
                         if Path(path).exists():
-                            note = self.index.index_file(path)
+                            note = self.index.index_file(path, force=force)
                             if note not in {"indexed", "unchanged"}:
                                 self.issue.emit(f"{Path(path).name}: {note}")
                         else:
@@ -185,7 +194,7 @@ class Worker(QThread):
                     except Exception:
                         logging.exception("File indexing failed: %s", path)
                         if attempts < 2:
-                            self.pending[path] = (time.monotonic() + 2, attempts + 1)
+                            self.pending[path] = (time.monotonic() + 2, attempts + 1, force)
                             continue
                         self.issue.emit(f"Could not index {Path(path).name}. Other files will continue; details are in logs.")
                     self.done += 1

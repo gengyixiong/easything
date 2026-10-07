@@ -342,10 +342,10 @@ def main():
     try:
         if file.exists():
             settings = json.loads(file.read_text(encoding="utf-8"))
-            if not isinstance(settings.get("folders"), list):
+            if not isinstance(settings, dict) or not isinstance(settings.get("folders"), list):
                 raise ValueError("Invalid settings")
             for folder in settings["folders"]:
-                if not isinstance(folder.get("path"), str) or not folder["path"] or not isinstance(folder.get("enabled"), bool) or not isinstance(folder.get("recursive"), bool):
+                if not isinstance(folder, dict) or not isinstance(folder.get("path"), str) or not folder["path"] or not isinstance(folder.get("enabled"), bool) or not isinstance(folder.get("recursive"), bool):
                     raise ValueError("Invalid folder settings")
     except (ValueError, KeyError, TypeError, OSError):
         logging.exception("Settings could not be read")
